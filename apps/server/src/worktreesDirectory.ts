@@ -8,6 +8,12 @@ import { expandHomePath } from "@t3tools/provider-core/server/pathExpansion";
 import * as ServerConfig from "./config.ts";
 import * as ServerSettings from "./serverSettings.ts";
 
+export const PROJECT_WORKTREES_DIRECTORY = "@project/.worktrees";
+
+export function resolveProjectWorktreesDirectory(projectRoot: string, path: Path.Path): string {
+  return path.resolve(projectRoot, ".worktrees");
+}
+
 /** Null for filesystem roots or settings not absolute on this host, including synced foreign-platform paths. */
 export function resolveWorktreesDirectory(
   setting: string,

@@ -51,7 +51,11 @@ import {
   removeEmptyDirectory,
   type RemoveEmptyDirectoryError,
 } from "../vcs/removeEmptyDirectory.ts";
-import { resolveWorktreesDirectory } from "../worktreesDirectory.ts";
+import {
+  PROJECT_WORKTREES_DIRECTORY,
+  resolveProjectWorktreesDirectory,
+  resolveWorktreesDirectory,
+} from "../worktreesDirectory.ts";
 import { isWithinRoot } from "./KnownWorkspaces.ts";
 import * as LayoutCommandApprovals from "./LayoutCommandApprovals.ts";
 import * as TaskFolderStore from "./TaskFolderStore.ts";
@@ -809,13 +813,18 @@ const make = Effect.gen(function* () {
     taskPlan: TaskFolderPlan,
     branch: string,
   ) {
-    const parent = resolveWorktreesDirectory(
+    const setting =
       (yield* settings.getSettings.pipe(Effect.orElseSucceed(() => ({ worktreesDirectory: "" }))))
-        .worktreesDirectory,
-      config.worktreesDir,
-      path,
-      yield* HostProcess.HomeDirectory,
-    );
+        .worktreesDirectory;
+    const parent =
+      setting === PROJECT_WORKTREES_DIRECTORY
+        ? resolveProjectWorktreesDirectory(taskPlan.projectRoot, path)
+        : resolveWorktreesDirectory(
+            setting,
+            config.worktreesDir,
+            path,
+            yield* HostProcess.HomeDirectory,
+          );
     if (parent === null) {
       return yield* new TaskFolderError({
         operation: "create",
