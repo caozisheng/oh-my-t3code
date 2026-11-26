@@ -933,7 +933,7 @@ export function BranchToolbarBranchSelector({
           />
         ) : null}
         {displayMode === "panel" ? (
-          <ThreadDetailsIssueRows links={linkedIssues} threadRef={threadRef} />
+          <ThreadDetailsIssueRows links={linkedIssues} threadRef={threadRef} allowLink />
         ) : null}
       </div>
     </BranchPicker>

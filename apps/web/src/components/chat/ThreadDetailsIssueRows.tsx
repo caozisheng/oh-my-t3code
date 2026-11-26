@@ -1,13 +1,19 @@
-import { threadIssueKeyOf, type ScopedThreadRef, type ThreadIssueLink } from "@t3tools/contracts";
+import {
+  AuthOrchestrationOperateScope,
+  threadIssueKeyOf,
+  type ScopedThreadRef,
+  type ThreadIssueLink,
+} from "@t3tools/contracts";
 import { scopedThreadKey } from "@t3tools/client-runtime/environment";
-import { useGT } from "gt-react";
-import { MessageSquareIcon } from "lucide-react";
+import { T, useGT } from "gt-react";
+import { MessageSquareIcon, PlusIcon } from "lucide-react";
 import { useState, type MouseEvent } from "react";
 
 import { cn } from "~/lib/utils";
 import { useRightPanelStore } from "~/rightPanelStore";
 import { useServerConfigs } from "~/state/entities";
 import { useLinkedIssueDetail } from "~/state/issues";
+import { useEnvironmentScope } from "~/state/session";
 
 import {
   IssueGlyph,
@@ -22,6 +28,9 @@ import {
 import { PullRequestActorLabel } from "../pullRequest/pullRequestPresentation";
 import { ThreadDetailsControl, ThreadDetailsMoreButton } from "./ThreadDetailsControl";
 import { SharedTooltipTrigger } from "../ui/shared-tooltip";
+import { Button } from "../ui/button";
+import { Dialog, DialogPopup, DialogTitle } from "../ui/dialog";
+import { ThreadDetailsIssuePicker } from "./ThreadDetailsIssuePicker";
 
 function LinkedIssueRow({
   link,
@@ -148,14 +157,23 @@ export function ThreadDetailsIssueRows({
   compact = true,
   mountScope = "thread-details",
   onOpen,
+  allowLink = false,
 }: {
   links: ReadonlyArray<ThreadIssueLink>;
   threadRef: ScopedThreadRef;
   compact?: boolean;
   mountScope?: "thread-details" | "linked-items" | "sidebar-tooltip";
   onOpen?: () => void;
+  allowLink?: boolean;
 }) {
   const [expandedThread, setExpandedThread] = useState<string | null>(null);
+  const canOperate = useEnvironmentScope(threadRef.environmentId, AuthOrchestrationOperateScope);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pending, setPending] = useState(false);
+  const linkedKeys = new Set(
+    links.map((link) => [link.tracker, link.host, link.scope, link.key].join("\u0000")),
+  );
+  const threadId = threadRef.threadId;
   const threadKey = scopedThreadKey(threadRef);
   const expanded = expandedThread === threadKey;
   const row = (link: ThreadIssueLink) => (
@@ -169,10 +187,42 @@ export function ThreadDetailsIssueRows({
     />
   );
   const [first, ...rest] = links;
-  if (first === undefined || !compact || rest.length === 0) return <>{links.map(row)}</>;
+  const addIssue = allowLink && canOperate && threadId !== undefined ? (
+    <>
+      <Button size="xs" variant="ghost" disabled={pending} onClick={() => setPickerOpen(true)}>
+        <PlusIcon aria-hidden className="size-3.5" />
+        <T>Link issue</T>
+      </Button>
+      {pickerOpen ? (
+        <Dialog open onOpenChange={(open) => (pending ? undefined : setPickerOpen(open))}>
+          <DialogPopup className="max-w-xl" showCloseButton={false}>
+            <DialogTitle>
+              <T>Link issue to this thread</T>
+            </DialogTitle>
+            <ThreadDetailsIssuePicker
+              environmentId={threadRef.environmentId}
+              threadId={threadId}
+              linkedKeys={linkedKeys}
+              pending={pending}
+              onPendingChange={setPending}
+              onLinked={() => setPickerOpen(false)}
+            />
+          </DialogPopup>
+        </Dialog>
+      ) : null}
+    </>
+  ) : null;
+  if (first === undefined || !compact || rest.length === 0)
+    return (
+      <>
+        {links.map(row)}
+        {addIssue}
+      </>
+    );
   return (
     <>
       {row(first)}
+      {addIssue}
       {expanded ? (
         <div data-thread-details-issue-list className="flex flex-col">
           {rest.map(row)}
