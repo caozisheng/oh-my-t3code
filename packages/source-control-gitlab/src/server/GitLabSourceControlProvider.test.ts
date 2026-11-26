@@ -117,6 +117,7 @@ it.effect.each([
   ["git@code.example.test:team/repo.git", true, "gitlab"],
   ["https://code.example.test/team/repo.git", false, "unknown"],
   ["https://github.com/team/repo.git", true, "github"],
+  ["http://192.168.1.20:8080/team/repo.git", true, "gitlab", "192.168.1.20:8080"],
 ] as const)(
   "resolves MR numbers for %s with authenticated=%s as %s",
   ([remoteUrl, authenticated, expectedProvider, expectedAuthHost = "code.example.test"]) =>
@@ -132,22 +133,25 @@ it.effect.each([
         ),
       };
       let authCalls = 0;
+      let resolvedBaseUrl: string | undefined;
       const refined = yield* (
         provider.refineRepositoryIdentity?.({
           identity,
-          resolveContext: (input) =>
-            refineUnknownRemoteProvider({
+          resolveContext: (input) => {
+            resolvedBaseUrl = input.context.provider.baseUrl;
+            return refineUnknownRemoteProvider({
               ...input,
               specs: [GitLabSourceControlProvider.discovery],
               process: {
-                run: ({ command, args, cwd }) => {
+                run: ({ command, args, cwd, env }) => {
                   authCalls++;
                   assert.deepStrictEqual(
-                    { command, args, cwd },
+                    { command, args, cwd, protocol: env?.GLAB_API_PROTOCOL },
                     {
                       command: "glab",
                       args: ["auth", "status", "--hostname", expectedAuthHost],
                       cwd: "/repo",
+                      protocol: remoteUrl.startsWith("http://") ? "http" : "https",
                     },
                   );
                   return Effect.succeed(
@@ -164,7 +168,8 @@ it.effect.each([
               Effect.map(({ provider }) =>
                 provider ? { ...input.context, provider } : input.context,
               ),
-            ),
+            );
+          },
         }) ?? Effect.succeed(identity)
       );
       if (expectedProvider === "gitlab") {
@@ -175,7 +180,7 @@ it.effect.each([
             repository: repository.join("/"),
             number: 42,
           }),
-          "https://code.example.test/team/repo/-/merge_requests/42",
+          `https://${expectedAuthHost.toLowerCase()}/team/repo/-/merge_requests/42`,
         );
       }
       assert.deepStrictEqual(refined, {
@@ -183,6 +188,12 @@ it.effect.each([
         provider: SourceControlProviderKind.make(expectedProvider),
       });
       if (expectedProvider === "github") assert.strictEqual(authCalls, 0);
+      if (expectedProvider === "gitlab") {
+        assert.strictEqual(
+          resolvedBaseUrl,
+          `${remoteUrl.startsWith("http://") ? "http" : "https"}://${expectedAuthHost}`,
+        );
+      }
     }),
 );
 
