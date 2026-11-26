@@ -10,6 +10,7 @@ import {
   resolveChangesTotals,
   resolveDefaultBranchActionDialogCopy,
   resolveFeatureBranchUnavailableReason,
+  shouldAssociateGitActionWithThread,
   resolveLiveThreadBranchUpdate,
   resolveQuickAction,
   getMenuActionDisabledReason,
@@ -40,6 +41,23 @@ function pushDisabledReason(gitStatus: VcsStatusResult): string | null {
   assert.isDefined(item);
   return getMenuActionDisabledReason({ item, gitStatus, isBusy: false, hasPrimaryRemote: true });
 }
+
+it.each([
+  { action: "create_pr", hasThreadId: true, canReadThread: false, expected: false },
+  { action: "create_pr", hasThreadId: true, canReadThread: true, expected: true },
+  { action: "commit_push_pr", hasThreadId: true, canReadThread: false, expected: false },
+  { action: "commit_push_pr", hasThreadId: true, canReadThread: true, expected: true },
+  { action: "push", hasThreadId: true, canReadThread: false, expected: true },
+  { action: "create_pr", hasThreadId: false, canReadThread: true, expected: false },
+] as const)(
+  "$action thread association with thread=$hasThreadId and read=$canReadThread",
+  ({ action, hasThreadId, canReadThread, expected }) => {
+    assert.equal(
+      shouldAssociateGitActionWithThread({ action, hasThreadId, canReadThread }),
+      expected,
+    );
+  },
+);
 
 describe("when: ref is clean, ahead, and has an open PR", () => {
   it("resolveQuickAction prefers push", () => {
