@@ -111,7 +111,12 @@ function refineUnknownGitLabRemote(input: SourceControlUnknownRemoteRefinementIn
 /** The caller refines only an identity no host recognised, so its remote is on an unknown host. */
 function unknownRemoteProvider(remoteUrl: string) {
   const remote = parseGitRemoteHost(remoteUrl);
-  return remote === null ? null : unknownHostProvider(remote);
+  if (remote === null) return null;
+  const provider = unknownHostProvider(remote);
+  const protocol = /^https?:/iu.exec(remoteUrl.trim())?.[0];
+  return protocol === undefined
+    ? provider
+    : { ...provider, baseUrl: `${protocol}//${remote.host}` };
 }
 
 // A glab login confirms a self-hosted GitLab whose hostname does not identify its provider.
@@ -173,6 +178,11 @@ export const discovery = {
       ? remoteHost.slice(0, provider.name.length)
       : provider.name;
     return ["auth", "status", "--hostname", host];
+  },
+  remoteRefinementEnv: ({ remoteUrl, provider }) => {
+    const protocol = /^https?:/iu.exec(remoteUrl.trim())?.[0] ??
+      /^https?:/iu.exec(provider.baseUrl)?.[0] ?? "https:";
+    return { GLAB_API_PROTOCOL: protocol.slice(0, -1).toLowerCase() };
   },
   parseAuth: parseGitLabAuth,
   refineUnknownRemote: refineUnknownGitLabRemote,
