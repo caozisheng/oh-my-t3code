@@ -7,6 +7,7 @@ import { ThreadDetailsControl } from "./chat/ThreadDetailsControl";
 import { useAtomMount, useAtomValue } from "@effect/atom-react";
 import {
   AuthOrchestrationOperateScope,
+  AuthOrchestrationReadScope,
   AuthSourceControlWriteScope,
   SourceControlProviderKind,
   type ProjectId,
@@ -62,6 +63,7 @@ import {
   resolveChangesTotals,
   resolveDefaultBranchActionDialogCopy,
   resolveFeatureBranchUnavailableReason,
+  shouldAssociateGitActionWithThread,
   resolveGitActionProgressPresentation,
   resolveGitActionResultToastTiming,
   resolveLiveThreadBranchUpdate,
@@ -1018,6 +1020,7 @@ function CheckoutGitActionsControl({
     AuthSourceControlWriteScope,
   );
   const canOperateThread = useEnvironmentScope(activeEnvironmentId, AuthOrchestrationOperateScope);
+  const canReadThread = useEnvironmentScope(activeEnvironmentId, AuthOrchestrationReadScope);
   const serverConfig = useAtomValue(serverEnvironment.configValueAtom(activeEnvironmentId));
   const openInPreferredEditor = useOpenInPreferredEditor(
     activeEnvironmentId,
@@ -1241,7 +1244,14 @@ function CheckoutGitActionsControl({
       ...(commitMessage ? { commitMessage } : {}),
       ...(featureBranch ? { featureBranch } : {}),
       ...(filePaths ? { filePaths } : {}),
-      ...(owner?.threadId ? { threadId: owner.threadId } : {}),
+      ...(owner?.threadId &&
+      shouldAssociateGitActionWithThread({
+        action,
+        hasThreadId: true,
+        canReadThread,
+      })
+        ? { threadId: owner.threadId }
+        : {}),
       ...(owner?.projectId ? { projectId: owner.projectId } : {}),
     });
 

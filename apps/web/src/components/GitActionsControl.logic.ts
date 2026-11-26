@@ -56,6 +56,18 @@ export interface GitActionResultToastTiming {
 
 export const GIT_ACTION_SUCCESS_VISIBLE_MS = 10_000;
 
+export function shouldAssociateGitActionWithThread(input: {
+  readonly action: GitStackedAction;
+  readonly hasThreadId: boolean;
+  readonly canReadThread: boolean;
+}): boolean {
+  if (!input.hasThreadId) return false;
+  if (input.action === "create_pr" || input.action === "commit_push_pr") {
+    return input.canReadThread;
+  }
+  return true;
+}
+
 export function resolveGitActionResultToastTiming(
   type: "error" | "success",
 ): GitActionResultToastTiming {
