@@ -51,6 +51,8 @@ import {
 } from "./useScopedSettings";
 import { settingsScopeEnvironmentLabel } from "./settingsScopeAxis";
 
+const PROJECT_WORKTREES_DIRECTORY = "@project/.worktrees";
+
 export function WorktreesDirectoryRow() {
   const setting = useSearchableSetting();
   const gt = useGT();
@@ -58,6 +60,14 @@ export function WorktreesDirectoryRow() {
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
   const mixed = useScopedSettingsMixed(["worktreesDirectory"]);
+  const [customSelected, setCustomSelected] = useState(false);
+  const worktreeLocationMode = mixed
+    ? "mixed"
+    : settings.worktreesDirectory === PROJECT_WORKTREES_DIRECTORY
+      ? "project"
+      : settings.worktreesDirectory !== "" || customSelected
+        ? "custom"
+        : "default";
   const edited = useRef(false);
   const draft = useRef("");
   if (
@@ -73,7 +83,7 @@ export function WorktreesDirectoryRow() {
     <SettingsRow
       {...setting("storage-worktrees-location")}
       description={gt(
-        "Folder where new worktrees are created, on any drive, such as D:\\worktrees or ~/worktrees. Existing worktrees stay where they are. Leave empty to use the T3 home folder.",
+        "Choose where new worktrees are created. Existing worktrees stay where they are.",
       )}
       serverScoped
       settingKeys={["worktreesDirectory"]}
@@ -86,28 +96,64 @@ export function WorktreesDirectoryRow() {
         ) : null
       }
       control={
-        <Input
-          key={`${scopeKey}:${mixed}:${settings.worktreesDirectory}`}
-          aria-label={gt("Worktree location")}
-          autoCapitalize="none"
-          spellCheck={false}
-          placeholder={mixed ? gt("Mixed") : gt("Default")}
-          defaultValue={mixed ? "" : settings.worktreesDirectory}
-          onFocus={(event) => {
-            draft.current = event.target.value;
-          }}
-          onChange={(event) => {
-            edited.current = true;
-            draft.current = resolvePastedPath(draft.current, event.target.value);
-            event.target.value = draft.current;
-          }}
-          onBlur={(event) => {
-            const value = event.target.value.trim();
-            if (edited.current && (mixed || value !== settings.worktreesDirectory))
-              updateSettings({ worktreesDirectory: value });
-            edited.current = false;
-          }}
-        />
+        <div className="flex min-w-0 flex-col gap-2">
+          <Select
+            value={worktreeLocationMode}
+            onValueChange={(value) => {
+              if (value === "default") {
+                setCustomSelected(false);
+                updateSettings({ worktreesDirectory: "" });
+              } else if (value === "project") {
+                setCustomSelected(false);
+                updateSettings({ worktreesDirectory: PROJECT_WORKTREES_DIRECTORY });
+              } else if (value === "custom") {
+                setCustomSelected(true);
+                updateSettings({ worktreesDirectory: "" });
+              }
+            }}
+          >
+            <SelectTrigger size="sm" aria-label={gt("Worktree location")}>
+              <SelectValue>
+                {worktreeLocationMode === "mixed"
+                  ? gt("Mixed")
+                  : worktreeLocationMode === "project"
+                    ? gt("Project .worktrees folder")
+                    : worktreeLocationMode === "custom"
+                      ? gt("Custom folder")
+                      : gt("T3 home folder")}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectPopup align="end" alignItemWithTrigger={false}>
+              <SelectItem value="default"><T>T3 home folder</T></SelectItem>
+              <SelectItem value="project"><T>Project .worktrees folder</T></SelectItem>
+              <SelectItem value="custom"><T>Custom folder</T></SelectItem>
+            </SelectPopup>
+          </Select>
+          {worktreeLocationMode === "custom" && (
+            <Input
+              key={`${scopeKey}:${mixed}:${settings.worktreesDirectory}`}
+              aria-label={gt("Custom worktree folder")}
+              autoCapitalize="none"
+              spellCheck={false}
+              placeholder={gt("D:\\worktrees or ~/worktrees")}
+              defaultValue={settings.worktreesDirectory}
+              onFocus={(event) => {
+                draft.current = event.target.value;
+              }}
+              onChange={(event) => {
+                edited.current = true;
+                draft.current = resolvePastedPath(draft.current, event.target.value);
+                event.target.value = draft.current;
+              }}
+              onBlur={(event) => {
+                const value = event.target.value.trim();
+                if (edited.current && value !== settings.worktreesDirectory)
+                  updateSettings({ worktreesDirectory: value });
+                edited.current = false;
+              }}
+            />
+          )}
+        </div>
       }
     />
   );

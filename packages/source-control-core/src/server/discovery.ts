@@ -53,6 +53,10 @@ export type SourceControlCliDiscoverySpec = SourceControlDiscoverySpecBase & {
   readonly remoteRefinementArgs?: (
     context: SourceControlProvider.SourceControlProviderContext,
   ) => ReadonlyArray<string>;
+  readonly remoteRefinementEnv?: (
+    context: SourceControlProvider.SourceControlProviderContext,
+    environment: NodeJS.ProcessEnv,
+  ) => Record<string, string>;
   readonly probeTimeoutMs?: number;
   readonly parseAuth: (input: SourceControlAuthProbeInput) => SourceControlProviderAuth;
   /** `null` when the CLI holds nothing for the remote; `undefined` when its output cannot say. */
@@ -428,19 +432,25 @@ function refineWithSpec(input: {
   if (!isCliRemoteRefinementSpec(spec)) return Effect.succeed(null);
   const args = spec.remoteRefinementArgs?.(context) ?? spec.authArgs;
   return Effect.service(HostProcess.Environment).pipe(
-    Effect.flatMap((environment) =>
-      input.process.run({
+    Effect.flatMap((environment) => {
+      const env = {
+        ...(spec.probeEnv ? spec.probeEnv(args, environment) : {}),
+        ...(spec.remoteRefinementEnv
+          ? spec.remoteRefinementEnv(context, environment)
+          : {}),
+      };
+      return input.process.run({
         operation: "source-control.discovery.refine-unknown-remote",
         command: spec.executable,
         args,
         cwd: input.cwd,
-        ...(spec.probeEnv ? { env: spec.probeEnv(args, environment) } : {}),
+        ...(Object.keys(env).length > 0 ? { env } : {}),
         allowNonZeroExit: true,
         timeoutMs: probeTimeoutMs(spec),
         maxOutputBytes: 8_000,
         appendTruncationMarker: true,
-      }),
-    ),
+      });
+    }),
     Effect.catchIf(isMissingExecutable, () => Effect.void),
     Effect.flatMap((auth) => {
       const provider =

@@ -8402,6 +8402,17 @@ it.layer(layerTest)("GitVcsDriver core integration", (it) => {
         );
         assert.equal(yield* fileSystem.exists(created.worktree.path), true);
 
+        const projectDirectoryWorktree = yield* driver.createWorktree(
+          { cwd, path: null, refName: initialBranch, newRefName: "feature/project-dir" },
+          { worktreesDirectory: "@project/.worktrees" },
+        );
+        assert.equal(
+          pathService.dirname(projectDirectoryWorktree.worktree.path),
+          pathService.join(cwd, ".worktrees", pathService.basename(cwd)),
+        );
+        yield* git(cwd, ["worktree", "remove", "--force", projectDirectoryWorktree.worktree.path]);
+        yield* git(cwd, ["branch", "-D", "feature/project-dir"]);
+
         yield* git(cwd, ["worktree", "remove", "--force", created.worktree.path]);
         yield* git(cwd, ["branch", "-D", "feature/custom-dir"]);
         yield* fileSystem.makeDirectory(created.worktree.path);

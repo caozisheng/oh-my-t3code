@@ -52,7 +52,11 @@ import { VcsAutomaticFetchInterval } from "./VcsAutomaticFetchInterval.ts";
 import { gitConfigEnv, serverGitConfigEnv, unsetInheritedRepositoryEnv } from "./VcsProcess.ts";
 import { makeWorktreeCheckoutCache } from "./worktreeCheckoutCache.ts";
 import { removeLinkedWorktree } from "./worktreeRemoval.ts";
-import { resolveWorktreesDirectory } from "../worktreesDirectory.ts";
+import {
+  PROJECT_WORKTREES_DIRECTORY,
+  resolveProjectWorktreesDirectory,
+  resolveWorktreesDirectory,
+} from "../worktreesDirectory.ts";
 import {
   parseRemoteNames,
   parseRemoteNamesInGitOrder,
@@ -6605,12 +6609,15 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
     const repoName = path.basename(path.resolve(input.cwd));
     let worktreePath = input.path;
     if (worktreePath == null) {
-      const parentDir = resolveWorktreesDirectory(
-        options?.worktreesDirectory ?? "",
-        worktreesDir,
-        path,
-        yield* HostProcess.HomeDirectory,
-      );
+      const worktreesSetting = options?.worktreesDirectory ?? "";
+      const parentDir = worktreesSetting === PROJECT_WORKTREES_DIRECTORY
+        ? resolveProjectWorktreesDirectory(input.cwd, path)
+        : resolveWorktreesDirectory(
+            worktreesSetting,
+            worktreesDir,
+            path,
+            yield* HostProcess.HomeDirectory,
+          );
       if (parentDir === null) {
         return yield* new GitCommandError({
           operation: "GitVcsDriver.createWorktree",
